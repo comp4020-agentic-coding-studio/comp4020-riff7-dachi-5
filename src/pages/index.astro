@@ -145,10 +145,15 @@ const boardData = bookings.map(({ roomId, pod, startsAt, endsAt }) => ({
                   <div class="timeline-scale" aria-hidden="true">
                     <span>08</span><span>11</span><span>14</span><span>17</span><span>20</span>
                   </div>
-                  <a class="book-link" href={bookHref}>
-                    Book {room.name.split(" — ").pop()}
-                    <span class="visually-hidden"> ({room.name}), next free hour</span>
-                  </a>
+                  <div class="card-links">
+                    <a class="book-link" href={bookHref}>
+                      Book {room.name.split(" — ").pop()}
+                      <span class="visually-hidden"> ({room.name}), next free hour</span>
+                    </a>
+                    <a href={`/kiosk/?room=${room.id}`}>
+                      Door display<span class="visually-hidden"> for {room.name}</span>
+                    </a>
+                  </div>
                 </div>
               </li>
             ))

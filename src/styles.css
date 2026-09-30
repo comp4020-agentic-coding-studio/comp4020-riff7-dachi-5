@@ -301,6 +301,89 @@ nav {
   background: #fff;
 }
 
+body.kiosk {
+  min-height: 100vh;
+  box-sizing: border-box;
+  color: #fff;
+  background: #0f5132;
+  transition: background 0.6s;
+}
+
+body.kiosk.busy {
+  background: #7a0c1e;
+}
+
+body.kiosk a {
+  color: #fff;
+}
+
+.kiosk nav {
+  flex-wrap: wrap;
+}
+
+.kiosk nav a[aria-current="page"] {
+  font-weight: 700;
+  text-underline-offset: 0.3em;
+}
+
+.kiosk-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 2rem;
+  align-items: start;
+}
+
+@media (max-width: 40rem) {
+  .kiosk-main {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kiosk-img {
+  width: 100%;
+  height: auto;
+  border-radius: 1rem;
+  border: 4px solid rgb(255 255 255 / 0.6);
+}
+
+.kiosk h1 {
+  margin: 0;
+  font-size: clamp(1.4rem, 3vw, 2.2rem);
+}
+
+.kiosk-state {
+  display: flex;
+  flex-direction: column;
+  margin: 0.5rem 0 1.5rem;
+}
+
+#kiosk-word {
+  font-size: clamp(3.5rem, 12vw, 8rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.04em;
+}
+
+.kiosk-detail {
+  font-size: 1.3rem;
+}
+
+.kiosk-upcoming {
+  font-size: 1.2rem;
+  padding-inline-start: 1.2rem;
+}
+
+.kiosk-clock {
+  opacity: 0.85;
+}
+
+.card-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .busy .book-link {
   background: #4a4a4a;
 }
