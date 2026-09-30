@@ -1,4 +1,11 @@
 ---
+import {
+  nowPosition,
+  roomStatus,
+  statusText,
+  suggestSlot,
+  timelineBlocks,
+} from "../lib/board";
 import { listBookings, listRooms, nowLocal } from "../lib/db";
 import "../styles.css";
 
@@ -26,6 +33,30 @@ const resubmitPod = Astro.url.searchParams.get("pod") ?? "";
 const resubmitTutor = Astro.url.searchParams.get("tutor") ?? "";
 const resubmitStartsAt = Astro.url.searchParams.get("startsAt") ?? "";
 const resubmitEndsAt = Astro.url.searchParams.get("endsAt") ?? "";
+
+const now = nowLocal();
+const today = now.slice(0, 10);
+const board = rooms.map((room) => {
+  const roomBookings = bookings.filter((b) => b.roomId === room.id);
+  const status = roomStatus(roomBookings, now);
+  const slot = suggestSlot(roomBookings, now);
+  const bookHref = `/?${new URLSearchParams({ roomId: String(room.id), ...slot })}#book`;
+  return {
+    room,
+    status,
+    text: statusText(status, now),
+    blocks: timelineBlocks(roomBookings, today),
+    bookHref,
+  };
+});
+const freeCount = board.filter((r) => r.status.state === "free").length;
+const nowAt = nowPosition(now);
+const boardData = bookings.map(({ roomId, pod, startsAt, endsAt }) => ({
+  roomId,
+  pod,
+  startsAt,
+  endsAt,
+}));
 ---
 
 <!doctype html>
@@ -41,12 +72,55 @@ const resubmitEndsAt = Astro.url.searchParams.get("endsAt") ?? "";
       <a href="/readme/">About</a>
     </nav>
     <main>
+      <img
+        class="hero"
+        src="/hero.svg"
+        alt="Illustrated campus skyline with lit windows: green for free rooms, red for booked ones"
+        width="800"
+        height="160"
+      />
       <h1>Crit Rooms</h1>
       <p>
         Book one of the course's crit rooms for a pod's session. Two pods can't
         book the same room for overlapping times — the form below checks
         before it accepts anything, so nobody finds out in person.
       </p>
+
+      <section aria-labelledby="board-heading">
+        <h2 id="board-heading">Right now</h2>
+        <p class="summary" id="free-summary" aria-live="polite">
+          <strong>{freeCount} of {rooms.length}</strong> rooms free at {now.slice(11, 16)}
+        </p>
+        <ul class="board" id="board">
+          {
+            board.map(({ room, status, text, blocks, bookHref }) => (
+              <li class={`card ${status.state}`} data-room-id={room.id}>
+                <img src={`/rooms/${room.id}.svg`} alt="" width="320" height="180" />
+                <div class="card-body">
+                  <h3>{room.name}</h3>
+                  <p class="status">
+                    <span class="dot" aria-hidden="true" />
+                    <span class="status-text">{text}</span>
+                  </p>
+                  <div class="timeline" role="img" aria-label={`Today's bookings for ${room.name}: ${blocks.length ? blocks.map((b) => b.label).join(", ") : "none"}`}>
+                    {blocks.map((b) => (
+                      <span class="block" style={`left:${b.left}%;width:${b.width}%`} title={b.label} />
+                    ))}
+                    {nowAt !== undefined && <span class="now" style={`left:${nowAt}%`} />}
+                  </div>
+                  <div class="timeline-scale" aria-hidden="true">
+                    <span>08</span><span>11</span><span>14</span><span>17</span><span>20</span>
+                  </div>
+                  <a class="book-link" href={bookHref}>
+                    Book {room.name.split(" — ").pop()}
+                    <span class="visually-hidden"> ({room.name}), next free hour</span>
+                  </a>
+                </div>
+              </li>
+            ))
+          }
+        </ul>
+      </section>
 
       {
         errorCode && (
@@ -57,7 +131,8 @@ const resubmitEndsAt = Astro.url.searchParams.get("endsAt") ?? "";
         )
       }
 
-      <form method="post" action="/api/bookings">
+      <h2 id="book">Book a room</h2>
+      <form method="post" action="/api/bookings" aria-labelledby="book">
         <div class="field">
           <label for="roomId">Room</label>
           <select id="roomId" name="roomId" required>
@@ -155,20 +230,104 @@ const resubmitEndsAt = Astro.url.searchParams.get("endsAt") ?? "";
       <p>New bookings from other tabs appear here as they happen.</p>
       <ul id="live" aria-labelledby="live-heading" aria-live="polite"></ul>
     </main>
+    {/* "<" escaped so a pod name can't close this script element early */}
+    <script
+      is:inline
+      type="application/json"
+      id="board-data"
+      set:html={JSON.stringify(boardData).replace(/</g, "\\u003c")}
+    />
     <script>
-      // The live half of the app: subscribe to the SSE stream and note new
-      // bookings from other tabs as they happen. The form itself needs none
-      // of this — its POST + redirect re-renders the submitting tab's own
-      // schedule from SQLite; this stream is how every other tab finds out,
-      // without re-sorting the schedule table client-side.
+      import {
+        type BoardBooking,
+        nowLocal,
+        nowPosition,
+        roomStatus,
+        statusText,
+        suggestSlot,
+        timelineBlocks,
+      } from "../lib/board";
+
+      const all: BoardBooking[] = JSON.parse(
+        document.querySelector("#board-data")?.textContent ?? "[]",
+      );
+
+      // Re-derives every card from the same pure functions the server used,
+      // so the board never drifts from what a reload would show.
+      function render() {
+        const now = nowLocal();
+        const today = now.slice(0, 10);
+        const nowAt = nowPosition(now);
+        let free = 0;
+        const cards = document.querySelectorAll<HTMLElement>("#board .card");
+        for (const card of cards) {
+          const roomId = Number(card.dataset.roomId);
+          const name = card.querySelector("h3")?.textContent ?? "";
+          const mine = all.filter((b) => b.roomId === roomId);
+          const status = roomStatus(mine, now);
+          if (status.state === "free") free++;
+          card.classList.toggle("free", status.state === "free");
+          card.classList.toggle("busy", status.state === "busy");
+          const text = card.querySelector(".status-text");
+          if (text) text.textContent = statusText(status, now);
+
+          const timeline = card.querySelector<HTMLElement>(".timeline");
+          if (timeline) {
+            const blocks = timelineBlocks(mine, today);
+            timeline.replaceChildren(
+              ...blocks.map((b) => {
+                const el = document.createElement("span");
+                el.className = "block";
+                el.style.left = `${b.left}%`;
+                el.style.width = `${b.width}%`;
+                el.title = b.label;
+                return el;
+              }),
+            );
+            if (nowAt !== undefined) {
+              const marker = document.createElement("span");
+              marker.className = "now";
+              marker.style.left = `${nowAt}%`;
+              timeline.append(marker);
+            }
+            timeline.setAttribute(
+              "aria-label",
+              `Today's bookings for ${name}: ${blocks.length ? blocks.map((b) => b.label).join(", ") : "none"}`,
+            );
+          }
+
+          const link = card.querySelector<HTMLAnchorElement>(".book-link");
+          if (link) {
+            const slot = suggestSlot(mine, now);
+            link.href = `/?${new URLSearchParams({ roomId: String(roomId), ...slot })}#book`;
+          }
+        }
+        const summary = document.querySelector("#free-summary");
+        if (summary) {
+          const strong = document.createElement("strong");
+          strong.textContent = `${free} of ${cards.length}`;
+          summary.replaceChildren(strong, ` rooms free at ${now.slice(11, 16)}`);
+        }
+      }
+
+      // The live half of the app: every other tab hears about a new booking
+      // over SSE — it lands in "Just booked" and re-lights the board.
       const live = document.querySelector("#live");
       const source = new EventSource("/api/events");
       source.addEventListener("message", (event) => {
         const booking = JSON.parse(event.data);
+        all.push(booking);
+        render();
+        const card = document.querySelector<HTMLElement>(`#board .card[data-room-id="${booking.roomId}"]`);
+        card?.classList.remove("flash");
+        void card?.offsetWidth;
+        card?.classList.add("flash");
         const item = document.createElement("li");
         item.textContent = `${booking.roomName}: ${booking.pod}, ${booking.startsAt.replace("T", " ")}–${booking.endsAt.replace("T", " ")}`;
         live?.prepend(item);
       });
+
+      setInterval(render, 30_000);
     </script>
   </body>
 </html>

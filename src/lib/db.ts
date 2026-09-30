@@ -79,19 +79,7 @@ export function listBookings(): BookingWithRoom[] {
 // the query layer. `nowLocal` produces "now" in that same shape, in the
 // campus's own timezone regardless of what timezone the server process
 // itself runs in (Fly's machines run in UTC).
-export function nowLocal(): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Australia/Canberra",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(new Date());
-  const get = (type: string) => parts.find((p) => p.type === type)?.value;
-  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
-}
+export { nowLocal } from "./board";
 
 /** The existing booking a new one for the same room would collide with, if
  *  any — two half-open windows [startsAt, endsAt) overlap exactly when each

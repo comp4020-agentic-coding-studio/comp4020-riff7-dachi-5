@@ -84,3 +84,164 @@ tr.past {
 #live {
   padding-inline-start: 1.2rem;
 }
+
+main {
+  max-width: 56rem;
+}
+
+nav {
+  max-width: 56rem;
+}
+
+.hero {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.summary {
+  font-size: 1.15rem;
+}
+
+.board {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  border: 2px solid #ddd;
+  border-radius: 0.8rem;
+  overflow: hidden;
+  background: #fff;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.card img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.card.free {
+  border-color: #1a7f45;
+}
+
+.card.busy {
+  border-color: #a40e26;
+}
+
+.card.busy img {
+  filter: saturate(0.4);
+}
+
+.card.flash {
+  animation: flash 1.2s ease-out;
+}
+
+@keyframes flash {
+  from {
+    box-shadow: 0 0 0 8px #ffd166;
+  }
+  to {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card.flash {
+    animation: none;
+  }
+}
+
+.card-body {
+  padding: 0.6rem 0.9rem 0.9rem;
+}
+
+.card h3 {
+  margin: 0 0 0.3rem;
+  font-size: 1rem;
+}
+
+.status {
+  display: flex;
+  gap: 0.45rem;
+  align-items: baseline;
+  margin: 0 0 0.6rem;
+  font-size: 0.92rem;
+}
+
+.dot {
+  flex: none;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: #1a7f45;
+}
+
+.busy .dot {
+  background: #a40e26;
+}
+
+.timeline {
+  position: relative;
+  height: 0.9rem;
+  border-radius: 0.3rem;
+  background: #e3f2e9;
+  overflow: hidden;
+}
+
+.timeline .block {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: #d9485f;
+}
+
+.timeline .now {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: #1a1a1a;
+}
+
+.timeline-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: #595959;
+  margin-bottom: 0.6rem;
+}
+
+.book-link {
+  display: inline-block;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: #0b5fff;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.book-link:focus-visible,
+.book-link:hover {
+  background: #0846c4;
+}
+
+.busy .book-link {
+  background: #4a4a4a;
+}
