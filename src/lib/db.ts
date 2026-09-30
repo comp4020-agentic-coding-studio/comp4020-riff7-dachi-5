@@ -81,6 +81,10 @@ export function listBookings(): BookingWithRoom[] {
 // itself runs in (Fly's machines run in UTC).
 export { nowLocal } from "./board";
 
+export function getBooking(id: number): BookingWithRoom | undefined {
+  return listBookings().find((b) => b.id === id);
+}
+
 /** The existing booking a new one for the same room would collide with, if
  *  any — two half-open windows [startsAt, endsAt) overlap exactly when each
  *  starts before the other ends. */

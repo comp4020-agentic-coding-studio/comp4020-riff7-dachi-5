@@ -236,6 +236,7 @@ const boardData = bookings.map(({ roomId, pod, startsAt, endsAt }) => ({
                   <th scope="col">Tutor</th>
                   <th scope="col">Starts</th>
                   <th scope="col">Ends</th>
+                  <th scope="col">Calendar</th>
                 </tr>
               </thead>
               <tbody id="schedule">
@@ -255,6 +256,11 @@ const boardData = bookings.map(({ roomId, pod, startsAt, endsAt }) => ({
                       <td>
                         {booking.endsAt.replace("T", " ")}
                         {isPast && " (past)"}
+                      </td>
+                      <td>
+                        <a href={`/api/calendar/${booking.id}`} download>
+                          .ics<span class="visually-hidden"> for {booking.pod} in {booking.roomName}</span>
+                        </a>
                       </td>
                     </tr>
                   );

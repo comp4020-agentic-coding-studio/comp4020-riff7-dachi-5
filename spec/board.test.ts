@@ -84,6 +84,30 @@ describe("room board, rendered", () => {
     expect(html).toContain('src="/rooms/1.svg"');
   });
 
+  it("serves a calendar file for a booking, and 404s an unknown one", async () => {
+    const form = new URLSearchParams({
+      roomId: "4",
+      pod: "Calendar, pod; test",
+      tutor: "",
+      startsAt: "2031-03-03T10:00",
+      endsAt: "2031-03-03T11:00",
+    });
+    await fetch(new URL("/api/bookings", baseUrl), {
+      method: "POST",
+      body: form,
+      headers: { Origin: new URL(baseUrl).origin },
+      redirect: "manual",
+    });
+    const html = await (await fetch(new URL("/", baseUrl))).text();
+    const id = [...html.matchAll(/\/api\/calendar\/(\d+)/g)].map((m) => m[1]).at(-1);
+    const res = await fetch(new URL(`/api/calendar/${id}`, baseUrl));
+    expect(res.headers.get("content-type")).toContain("text/calendar");
+    const ics = await res.text();
+    expect(ics).toContain("DTSTART;TZID=Australia/Sydney:20310303T100000");
+    expect(ics).toContain("SUMMARY:Crit: Calendar\\, pod\\; test");
+    expect((await fetch(new URL("/api/calendar/999999", baseUrl))).status).toBe(404);
+  });
+
   it("answers 'find me a room' with a bookable slot", async () => {
     const html = await (await fetch(new URL("/?need=90", baseUrl))).text();
     expect(html).toMatch(/Soonest 90-minute slot/);
