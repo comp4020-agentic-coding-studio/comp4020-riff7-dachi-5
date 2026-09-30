@@ -63,10 +63,13 @@ export function statusText(status: RoomStatus, now: string): string {
     : "Free now · nothing else booked";
 }
 
-/** The next free hour-long slot (shorter if another booking cuts in). */
+/** The next free slot of `minutes`, shortened if another booking cuts in,
+ *  but never below `minGap` — a shorter gap is skipped entirely. */
 export function suggestSlot(
   roomBookings: BoardBooking[],
   now: string,
+  minutes = 60,
+  minGap = 15,
 ): { startsAt: string; endsAt: string } {
   const sorted = [...roomBookings]
     .filter((b) => b.endsAt > now)
@@ -75,14 +78,35 @@ export function suggestSlot(
   for (const b of sorted) {
     if (b.startsAt <= start && start < b.endsAt) start = b.endsAt;
   }
-  let end = addMinutes(start, 60);
+  let end = addMinutes(start, minutes);
   const blocker = sorted.find((b) => b.startsAt >= start && b.startsAt < end);
   if (blocker) {
-    // a gap too short to use: book right after the blocker instead
-    if (addMinutes(start, 15) > blocker.startsAt) return suggestSlot(roomBookings, blocker.endsAt);
+    if (addMinutes(start, minGap) > blocker.startsAt) {
+      return suggestSlot(roomBookings, blocker.endsAt, minutes, minGap);
+    }
     end = blocker.startsAt;
   }
   return { startsAt: start, endsAt: end };
+}
+
+/** The room that can host a full `minutes`-long session soonest. */
+export function earliestRoom<R extends { id: number }>(
+  rooms: R[],
+  allBookings: BoardBooking[],
+  now: string,
+  minutes: number,
+): { room: R; startsAt: string; endsAt: string } | undefined {
+  return rooms
+    .map((room) => ({
+      room,
+      ...suggestSlot(
+        allBookings.filter((b) => b.roomId === room.id),
+        now,
+        minutes,
+        minutes,
+      ),
+    }))
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.room.id - b.room.id)[0];
 }
 
 export const DAY_START = 8 * 60;

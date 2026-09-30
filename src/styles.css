@@ -242,6 +242,65 @@ nav {
   background: #0846c4;
 }
 
+.finder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.9rem 1rem;
+  border-radius: 0.8rem;
+  background: #eef3ff;
+}
+
+.finder h3 {
+  margin: 0;
+  flex-basis: 100%;
+}
+
+.finder fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.finder legend {
+  float: left;
+  margin-right: 0.4rem;
+}
+
+.chip {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  padding: 0.2rem 0.7rem;
+  border: 1px solid #0b5fff;
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.chip input {
+  width: auto;
+  margin: 0;
+}
+
+.chip:has(input:checked) {
+  background: #0b5fff;
+  color: #fff;
+}
+
+.match {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 0.5rem 0.8rem;
+  border-left: 4px solid #1a7f45;
+  background: #fff;
+}
+
 .busy .book-link {
   background: #4a4a4a;
 }

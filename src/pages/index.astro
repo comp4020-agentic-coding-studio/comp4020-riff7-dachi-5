@@ -1,5 +1,6 @@
 ---
 import {
+  earliestRoom,
   nowPosition,
   roomStatus,
   statusText,
@@ -51,6 +52,13 @@ const board = rooms.map((room) => {
 });
 const freeCount = board.filter((r) => r.status.state === "free").length;
 const nowAt = nowPosition(now);
+const NEED_OPTIONS = [30, 60, 90, 120];
+const needParam = Number(Astro.url.searchParams.get("need"));
+const need = NEED_OPTIONS.includes(needParam) ? needParam : undefined;
+const match = need ? earliestRoom(rooms, bookings, now, need) : undefined;
+const matchHref = match
+  ? `/?${new URLSearchParams({ roomId: String(match.room.id), startsAt: match.startsAt, endsAt: match.endsAt })}#book`
+  : undefined;
 const boardData = bookings.map(({ roomId, pod, startsAt, endsAt }) => ({
   roomId,
   pod,
@@ -91,6 +99,32 @@ const boardData = bookings.map(({ roomId, pod, startsAt, endsAt }) => ({
         <p class="summary" id="free-summary" aria-live="polite">
           <strong>{freeCount} of {rooms.length}</strong> rooms free at {now.slice(11, 16)}
         </p>
+        <form method="get" action="/#finder" class="finder" id="finder" aria-labelledby="finder-heading">
+          <h3 id="finder-heading">Find me a room</h3>
+          <fieldset>
+            <legend>I need it for</legend>
+            {
+              NEED_OPTIONS.map((m) => (
+                <label class="chip">
+                  <input type="radio" name="need" value={m} checked={need === m || (!need && m === 60)} />
+                  {m < 60 ? `${m} min` : `${m / 60} h`.replace(".5 h", "½ h")}
+                </label>
+              ))
+            }
+          </fieldset>
+          <button>Find the soonest slot</button>
+          {
+            match && matchHref && (
+              <p class="match" role="status">
+                Soonest {need}-minute slot:{" "}
+                <strong>{match.room.name}</strong>,{" "}
+                {match.startsAt.slice(0, 10) === today ? "today" : match.startsAt.slice(0, 10)}{" "}
+                {match.startsAt.slice(11, 16)}–{match.endsAt.slice(11, 16)}.{" "}
+                <a href={matchHref}>Book it</a>
+              </p>
+            )
+          }
+        </form>
         <ul class="board" id="board">
           {
             board.map(({ room, status, text, blocks, bookHref }) => (
