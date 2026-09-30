@@ -1,0 +1,125 @@
+---
+import Icon from "../components/Icon.astro";
+import Base from "../layouts/Base.astro";
+import { type BookingWithRoom, listBookings, nowLocal } from "../lib/db";
+import { fmtDay, fmtTime } from "../lib/format";
+import { readMine } from "../lib/mine";
+import { detailsFor } from "../lib/spaces";
+
+const now = nowLocal();
+const ids = new Set(readMine(Astro.cookies).map((m) => m.id));
+const mine = listBookings().filter((b) => ids.has(b.id));
+const upcoming = mine.filter((b) => b.endsAt > now);
+const past = mine.filter((b) => b.endsAt <= now).reverse();
+
+const groups = new Map<string, BookingWithRoom[]>();
+for (const b of upcoming) {
+  const key = fmtDay(b.startsAt, now);
+  groups.set(key, [...(groups.get(key) ?? []), b]);
+}
+
+// "Room|start|end" from the cancel redirect, shown as a confirmation.
+const cancelled = Astro.url.searchParams.get("cancelled")?.split("|");
+const cancelledText =
+  cancelled?.length === 3
+    ? `${cancelled[0].split(" — ").pop()}, ${fmtDay(cancelled[1], now)} ${fmtTime(cancelled[1])} – ${fmtTime(cancelled[2])}`
+    : undefined;
+---
+
+<Base title="My bookings · Crit Rooms" active="mine">
+  <div class="wrap narrow">
+    <header class="page-head">
+      <p class="overline overline-gold">From this browser</p>
+      <h1>My bookings</h1>
+      <p class="muted">
+        There are no accounts: the bookings you make in this browser are remembered here,
+        and only here can they be cancelled.
+      </p>
+    </header>
+
+    {
+      cancelledText && (
+        <p class="notice notice-success" role="status">
+          <Icon name="check" /> Cancelled {cancelledText}. The room is free again for everyone.
+        </p>
+      )
+    }
+
+    {
+      upcoming.length === 0 ? (
+        <section class="empty empty-lg" aria-labelledby="empty-heading">
+          <h2 id="empty-heading" class="empty-title">Nothing booked yet</h2>
+          <p>When you book a room from this browser it appears here, ready to add to your calendar or cancel.</p>
+          <div class="empty-actions">
+            <a class="btn btn-primary" href="/">Find a space</a>
+            <a class="btn btn-secondary" href="/#results">See what's free now</a>
+          </div>
+        </section>
+      ) : (
+        [...groups].map(([day, items]) => (
+          <section class="day-group" aria-labelledby={`day-${items[0].id}`}>
+            <h2 id={`day-${items[0].id}`} class="day-title">{day}</h2>
+            <ul class="booking-list">
+              {items.map((b) => {
+                const d = detailsFor({ id: b.roomId, name: b.roomName });
+                const live = b.startsAt <= now && now < b.endsAt;
+                return (
+                  <li class="booking-row">
+                    <div class="booking-time">
+                      <span class="booking-start">{fmtTime(b.startsAt)}</span>
+                      <span class="muted">to {fmtTime(b.endsAt)}</span>
+                    </div>
+                    <div class="booking-info">
+                      <a class="booking-room" href={`/booking/${b.id}/`}>{d.room}</a>
+                      <span class="muted">{d.building} · {d.level} · {b.pod}</span>
+                      {live && <span class="status-pill free"><Icon name="check" /> Happening now</span>}
+                    </div>
+                    <div class="booking-actions">
+                      <a class="btn btn-secondary btn-sm" href={`/api/calendar/${b.id}`} download>
+                        <Icon name="calendar" /> <span class="hide-sm">Calendar</span>
+                        <span class="visually-hidden"> file for {d.room}</span>
+                      </a>
+                      <form method="post" action={`/api/bookings/${b.id}/cancel`} data-confirm="Cancel this booking? The room will be released for everyone.">
+                        <button class="btn btn-ghost btn-sm">
+                          Cancel<span class="visually-hidden"> {d.room} at {fmtTime(b.startsAt)}</span>
+                        </button>
+                      </form>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))
+      )
+    }
+
+    {
+      past.length > 0 && (
+        <details class="earlier">
+          <summary>Earlier bookings ({past.length})</summary>
+          <ul class="booking-list">
+            {past.map((b) => (
+              <li class="booking-row is-past">
+                <div class="booking-time">
+                  <span class="booking-start">{fmtDay(b.startsAt, now)}</span>
+                  <span class="muted">{fmtTime(b.startsAt)}</span>
+                </div>
+                <div class="booking-info">
+                  <a class="booking-room" href={`/booking/${b.id}/`}>
+                    {detailsFor({ id: b.roomId, name: b.roomName }).room}
+                  </a>
+                  <span class="muted">{b.pod} (past)</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )
+    }
+  </div>
+</Base>
+
+<script>
+  import "../scripts/confirm-cancel";
+</script>

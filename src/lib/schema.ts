@@ -36,6 +36,10 @@ export const bookings = sqliteTable("bookings", {
   createdAt: text("created_at")
     .notNull()
     .default(sql`(datetime('now'))`),
+  // A random secret handed only to the browser that made the booking (in an
+  // httpOnly cookie, see src/lib/mine.ts) — the only way to cancel without
+  // accounts. Null for bookings made before cancelling existed.
+  cancelToken: text("cancel_token"),
 });
 
 export type Room = typeof rooms.$inferSelect;

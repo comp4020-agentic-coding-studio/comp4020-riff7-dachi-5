@@ -109,6 +109,23 @@ export function earliestRoom<R extends { id: number }>(
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.room.id - b.room.id)[0];
 }
 
+/** The booking (if any) that overlaps the half-open window [start, end). */
+export function conflictIn(
+  roomBookings: BoardBooking[],
+  start: string,
+  end: string,
+): BoardBooking | undefined {
+  return roomBookings.find((b) => b.startsAt < end && b.endsAt > start);
+}
+
+/** When the room next stops being free, after `from`. */
+export function freeUntil(roomBookings: BoardBooking[], from: string): string | undefined {
+  return roomBookings
+    .filter((b) => b.startsAt >= from)
+    .map((b) => b.startsAt)
+    .sort()[0];
+}
+
 export const DAY_START = 8 * 60;
 export const DAY_END = 20 * 60;
 

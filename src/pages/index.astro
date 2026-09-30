@@ -1,378 +1,269 @@
 ---
-import {
-  earliestRoom,
-  nowPosition,
-  roomStatus,
-  statusText,
-  suggestSlot,
-  timelineBlocks,
-} from "../lib/board";
+import BookingSheet from "../components/BookingSheet.astro";
+import Icon from "../components/Icon.astro";
+import RoomCard from "../components/RoomCard.astro";
+import SearchPanel from "../components/SearchPanel.astro";
+import Base from "../layouts/Base.astro";
+import { conflictIn, suggestSlot } from "../lib/board";
 import { listBookings, listRooms, nowLocal } from "../lib/db";
-import "../styles.css";
+import { fmtDate, fmtDay, fmtDuration, fmtRange, fmtTime } from "../lib/format";
+import { readMine } from "../lib/mine";
+import { bookHref, parseSearch, rankRooms, searchHref } from "../lib/search";
+import { detailsFor } from "../lib/spaces";
 
 const rooms = listRooms();
 const bookings = listBookings();
-
-const ERROR_TEXT: Record<string, string> = {
-  missing: "Every field is required.",
-  "unknown-room": "That room doesn't exist.",
-  "bad-format": "That doesn't look like a valid date and time.",
-  "too-long": "Pod and tutor names can't be longer than 80 characters.",
-  "bad-range": "The booking has to end after it starts.",
-  conflict: "That room is already booked for part of that time.",
-};
-const errorCode = Astro.url.searchParams.get("error");
-const errorRoomId = Astro.url.searchParams.get("roomId");
-const errorRoomName = errorRoomId
-  ? rooms.find((room) => room.id === Number(errorRoomId))?.name
-  : undefined;
-
-// On a rejected submission, refill the form from what was actually sent —
-// see api/bookings.ts's withInput — rather than making someone retype every
-// field over a single bad one (WCAG 2.2 SC 3.3.7, Redundant Entry).
-const resubmitPod = Astro.url.searchParams.get("pod") ?? "";
-const resubmitTutor = Astro.url.searchParams.get("tutor") ?? "";
-const resubmitStartsAt = Astro.url.searchParams.get("startsAt") ?? "";
-const resubmitEndsAt = Astro.url.searchParams.get("endsAt") ?? "";
-
 const now = nowLocal();
-const today = now.slice(0, 10);
-const board = rooms.map((room) => {
-  const roomBookings = bookings.filter((b) => b.roomId === room.id);
-  const status = roomStatus(roomBookings, now);
-  const slot = suggestSlot(roomBookings, now);
-  const bookHref = `/?${new URLSearchParams({ roomId: String(room.id), ...slot })}#book`;
-  return {
-    room,
-    status,
-    text: statusText(status, now),
-    blocks: timelineBlocks(roomBookings, today),
-    bookHref,
-  };
-});
-const freeCount = board.filter((r) => r.status.state === "free").length;
-const nowAt = nowPosition(now);
-const NEED_OPTIONS = [30, 60, 90, 120];
-const needParam = Number(Astro.url.searchParams.get("need"));
-const need = NEED_OPTIONS.includes(needParam) ? needParam : undefined;
-const match = need ? earliestRoom(rooms, bookings, now, need) : undefined;
-const matchHref = match
-  ? `/?${new URLSearchParams({ roomId: String(match.room.id), startsAt: match.startsAt, endsAt: match.endsAt })}#book`
-  : undefined;
-const boardData = bookings.map(({ roomId, pod, startsAt, endsAt }) => ({
-  roomId,
-  pod,
-  startsAt,
-  endsAt,
-}));
+const params = Astro.url.searchParams;
+const search = parseSearch(params, now);
+const results = rankRooms(rooms, bookings, search);
+const shown = results.filter((r) => r.fits);
+const hiddenCount = results.length - shown.length;
+const freeShown = shown.filter((r) => r.available);
+
+// --- the booking sheet: opened by a selection link or a rejected POST ---
+const errorCode = params.get("error") ?? undefined;
+const selRoomId = Number(params.get("roomId")) || undefined;
+const sheetOpen = Boolean(errorCode || selRoomId);
+const selRoom = rooms.find((r) => r.id === selRoomId);
+const values = {
+  pod: params.get("pod") ?? "",
+  tutor: params.get("tutor") ?? "",
+  startsAt: params.get("startsAt") ?? "",
+  endsAt: params.get("endsAt") ?? "",
+};
+const validSel = /T\d\d:\d\d$/.test(values.startsAt) && values.startsAt < values.endsAt;
+const selBookings = bookings.filter((b) => b.roomId === selRoomId);
+const taken = selRoom && validSel ? conflictIn(selBookings, values.startsAt, values.endsAt) : undefined;
+const duration = search.duration;
+const alternatives: { label: string; href: string }[] = [];
+if (selRoom && validSel && taken) {
+  const same = suggestSlot(selBookings, values.startsAt, duration, duration);
+  alternatives.push({
+    label: `${detailsFor(selRoom).room} at ${fmtTime(same.startsAt)}${same.startsAt.slice(0, 10) !== values.startsAt.slice(0, 10) ? ` on ${fmtDate(same.startsAt.slice(0, 10))}` : ""}`,
+    href: bookHref(search, selRoom.id, same),
+  });
+  for (const r of results.filter((x) => x.available && x.room.id !== selRoom.id).slice(0, 2)) {
+    alternatives.push({
+      label: `${r.details.room}, ${r.details.building} at ${fmtTime(values.startsAt)}`,
+      href: bookHref(search, r.room.id, { startsAt: values.startsAt, endsAt: values.endsAt }),
+    });
+  }
+}
+const closeHref = `${searchHref(search, {})}#results`;
+
+// --- the side panel when nothing is selected: this browser's next bookings ---
+const mineIds = new Set(readMine(Astro.cookies).map((m) => m.id));
+const myNext = bookings
+  .filter((b) => mineIds.has(b.id) && b.endsAt > now)
+  .slice(0, 3);
+
+// --- empty state helpers ---
+const soonest = [...shown].sort((a, b) => a.next.startsAt.localeCompare(b.next.startsAt))[0];
+const shorter = [30, 60, 90, 120].filter((d) => d < duration).pop();
+
+const dayWord = fmtDay(search.start, now);
+const dayPhrase = dayWord === "Today" ? "today" : dayWord === "Tomorrow" ? "tomorrow" : `on ${dayWord}`;
+const nextDay = (ts: string) => (fmtDay(ts, now) === "Today" ? "" : `${fmtDay(ts, now)} `);
+
+const title = sheetOpen && selRoom ? `Book ${detailsFor(selRoom).room} · Crit Rooms` : "Find a space · Crit Rooms";
 ---
 
-<!doctype html>
-<html lang="en-AU">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Crit Rooms</title>
-  </head>
-  <body>
-    <nav aria-label="site">
-      <a href="/">Crit Rooms</a>
-      <a href="/readme/">About</a>
-    </nav>
-    <main>
-      <img
-        class="hero"
-        src="/hero.svg"
-        alt="Illustrated campus skyline with lit windows: green for free rooms, red for booked ones"
-        width="800"
-        height="160"
-      />
-      <h1>Crit Rooms</h1>
-      <p>
-        Book one of the course's crit rooms for a pod's session. Two pods can't
-        book the same room for overlapping times — the form below checks
-        before it accepts anything, so nobody finds out in person.
-      </p>
-
-      <section aria-labelledby="board-heading">
-        <h2 id="board-heading">Right now</h2>
-        <p class="summary" id="free-summary" aria-live="polite">
-          <strong>{freeCount} of {rooms.length}</strong> rooms free at {now.slice(11, 16)}
+<Base title={title} active="find" bodyClass={sheetOpen ? "sheet-open" : undefined}>
+  <section class="hero" aria-labelledby="hero-heading">
+    <div class="wrap hero-inner">
+      <div class="hero-copy">
+        <p class="overline overline-gold">Crit rooms · Semester 2</p>
+        <h1 id="hero-heading">Find a room.<br />Book it.<br /><span class="hero-soft">Get on with the crit.</span></h1>
+        <p class="hero-lede">
+          Every crit room on campus, with the whole day's availability at a glance.
+          Clashes are refused before anyone walks across campus to find out.
         </p>
-        <form method="get" action="/#finder" class="finder" id="finder" aria-labelledby="finder-heading">
-          <h3 id="finder-heading">Find me a room</h3>
-          <fieldset>
-            <legend>I need it for</legend>
-            {
-              NEED_OPTIONS.map((m) => (
-                <label class="chip">
-                  <input type="radio" name="need" value={m} checked={need === m || (!need && m === 60)} />
-                  {m < 60 ? `${m} min` : `${m / 60} h`.replace(".5 h", "½ h")}
-                </label>
-              ))
-            }
-          </fieldset>
-          <button>Find the soonest slot</button>
+        <p class="hero-stat" id="hero-stat">
+          <strong>{results.filter((r) => r.available).length} of {rooms.length}</strong> rooms free {dayPhrase} at {fmtTime(search.start)}
+        </p>
+      </div>
+      <SearchPanel search={search} now={now} />
+    </div>
+  </section>
+
+  <div class="wrap layout">
+    <section id="results" class="results" aria-labelledby="results-heading" aria-busy="false">
+      <header class="results-head">
+        <h2 id="results-heading">
           {
-            match && matchHref && (
-              <p class="match" role="status">
-                Soonest {need}-minute slot:{" "}
-                <strong>{match.room.name}</strong>,{" "}
-                {match.startsAt.slice(0, 10) === today ? "today" : match.startsAt.slice(0, 10)}{" "}
-                {match.startsAt.slice(11, 16)}–{match.endsAt.slice(11, 16)}.{" "}
-                <a href={matchHref}>Book it</a>
-              </p>
-            )
+            shown.length === 0
+              ? "No spaces match"
+              : freeShown.length === 0
+                ? "Nothing free for this time"
+                : `${freeShown.length} ${freeShown.length === 1 ? "space" : "spaces"} free`
           }
-        </form>
-        <ul class="board" id="board">
-          {
-            board.map(({ room, status, text, blocks, bookHref }) => (
-              <li class={`card ${status.state}`} data-room-id={room.id}>
-                <img src={`/rooms/${room.id}.svg`} alt="" width="320" height="180" />
-                <div class="card-body">
-                  <h3>{room.name}</h3>
-                  <p class="status">
-                    <span class="dot" aria-hidden="true" />
-                    <span class="status-text">{text}</span>
-                  </p>
-                  <div class="timeline" role="img" aria-label={`Today's bookings for ${room.name}: ${blocks.length ? blocks.map((b) => b.label).join(", ") : "none"}`}>
-                    {blocks.map((b) => (
-                      <span class="block" style={`left:${b.left}%;width:${b.width}%`} title={b.label} />
-                    ))}
-                    {nowAt !== undefined && <span class="now" style={`left:${nowAt}%`} />}
-                  </div>
-                  <div class="timeline-scale" aria-hidden="true">
-                    <span>08</span><span>11</span><span>14</span><span>17</span><span>20</span>
-                  </div>
-                  <div class="card-links">
-                    <a class="book-link" href={bookHref}>
-                      Book {room.name.split(" — ").pop()}
-                      <span class="visually-hidden"> ({room.name}), next free hour</span>
-                    </a>
-                    <a href={`/kiosk/?room=${room.id}`}>
-                      Door display<span class="visually-hidden"> for {room.name}</span>
-                    </a>
-                  </div>
-                </div>
-              </li>
-            ))
-          }
+        </h2>
+        <p class="results-context">
+          <Icon name="calendar" /> {fmtRange(search.start, search.end, now)}
+          <span class="dot-sep">·</span> {fmtDuration(search.duration)}
+          {search.people > 0 && <><span class="dot-sep">·</span> {search.people}+ people</>}
+        </p>
+        <ul class="legend" aria-label="Timeline key">
+          <li><span class="key key-free" aria-hidden="true" /> Available</li>
+          <li><span class="key key-booked" aria-hidden="true" /> Booked</li>
+          <li><span class="key key-sel" aria-hidden="true" /> Your time</li>
+          <li><span class="key key-past" aria-hidden="true" /> Past</li>
         </ul>
-      </section>
+      </header>
 
       {
-        errorCode && (
-          <p role="alert" class="error">
-            {ERROR_TEXT[errorCode] ?? "That booking couldn't be made."}
-            {errorCode === "conflict" && errorRoomName && ` (${errorRoomName})`}
+        search.movedFromPast && (
+          <p class="notice notice-info" role="status">
+            That time has already passed, so this shows availability from {fmtTime(search.start)} today.
           </p>
         )
       }
 
-      <h2 id="book">Book a room</h2>
-      <form method="post" action="/api/bookings" aria-labelledby="book">
-        <div class="field">
-          <label for="roomId">Room</label>
-          <select id="roomId" name="roomId" required>
-            {
-              rooms.map((room) => (
-                <option value={room.id} selected={errorRoomId === String(room.id)}>
-                  {room.name}
-                </option>
-              ))
-            }
-          </select>
-        </div>
-        <div class="field">
-          <label for="pod">Pod</label>
-          <input
-            id="pod"
-            name="pod"
-            required
-            maxlength="80"
-            placeholder="e.g. Dachi"
-            value={resubmitPod}
-          />
-        </div>
-        <div class="field">
-          <label for="tutor">Tutor</label>
-          <input
-            id="tutor"
-            name="tutor"
-            maxlength="80"
-            placeholder="optional"
-            value={resubmitTutor}
-          />
-        </div>
-        <div class="field">
-          <label for="startsAt">Starts</label>
-          <input
-            id="startsAt"
-            name="startsAt"
-            type="datetime-local"
-            required
-            value={resubmitStartsAt}
-          />
-        </div>
-        <div class="field">
-          <label for="endsAt">Ends</label>
-          <input id="endsAt" name="endsAt" type="datetime-local" required value={resubmitEndsAt} />
-        </div>
-        <button>Book the room</button>
-      </form>
-
-      <h2>Schedule</h2>
       {
-        bookings.length === 0 ? (
-          <p>No bookings yet.</p>
-        ) : (
-          <div class="table-scroll" tabindex="0" role="region" aria-label="Schedule">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Room</th>
-                  <th scope="col">Pod</th>
-                  <th scope="col">Tutor</th>
-                  <th scope="col">Starts</th>
-                  <th scope="col">Ends</th>
-                  <th scope="col">Calendar</th>
-                </tr>
-              </thead>
-              <tbody id="schedule">
-                {/* tr.past dims a finished booking, but colour alone can't be the
-                    only way to tell — WCAG 1.4.1, and axe-core has no rule that
-                    catches it since it can't judge what a colour means. The text
-                    suffix below is the real signal; the dimming is just a bonus
-                    for a sighted skim. */}
-                {bookings.map((booking) => {
-                  const isPast = booking.endsAt < nowLocal();
-                  return (
-                    <tr class={isPast ? "past" : undefined}>
-                      <td>{booking.roomName}</td>
-                      <td>{booking.pod}</td>
-                      <td>{booking.tutor ?? "—"}</td>
-                      <td>{booking.startsAt.replace("T", " ")}</td>
-                      <td>
-                        {booking.endsAt.replace("T", " ")}
-                        {isPast && " (past)"}
-                      </td>
-                      <td>
-                        <a href={`/api/calendar/${booking.id}`} download>
-                          .ics<span class="visually-hidden"> for {booking.pod} in {booking.roomName}</span>
-                        </a>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        shown.length > 0 && freeShown.length === 0 && soonest && (
+          <div class="empty">
+            <p class="empty-title">Every matching room is taken {fmtTime(search.start)} – {fmtTime(search.end)}.</p>
+            <div class="empty-actions">
+              <a class="btn btn-primary" href={bookHref(search, soonest.room.id, soonest.next)}>
+                Next available: {soonest.details.room}, {nextDay(soonest.next.startsAt)}{fmtTime(soonest.next.startsAt)}
+              </a>
+              {shorter && <a class="btn btn-secondary" href={`${searchHref(search, { duration: String(shorter) })}#results`}>Try {fmtDuration(shorter)}</a>}
+              <a class="btn btn-ghost" href="#finder-heading">Change time</a>
+            </div>
           </div>
         )
       }
 
-      <h2 id="live-heading">Just booked</h2>
-      <p>New bookings from other tabs appear here as they happen.</p>
-      <ul id="live" aria-labelledby="live-heading" aria-live="polite"></ul>
-    </main>
-    {/* "<" escaped so a pod name can't close this script element early */}
-    <script
-      is:inline
-      type="application/json"
-      id="board-data"
-      set:html={JSON.stringify(boardData).replace(/</g, "\\u003c")}
-    />
-    <script>
-      import {
-        type BoardBooking,
-        nowLocal,
-        nowPosition,
-        roomStatus,
-        statusText,
-        suggestSlot,
-        timelineBlocks,
-      } from "../lib/board";
-
-      const all: BoardBooking[] = JSON.parse(
-        document.querySelector("#board-data")?.textContent ?? "[]",
-      );
-
-      // Re-derives every card from the same pure functions the server used,
-      // so the board never drifts from what a reload would show.
-      function render() {
-        const now = nowLocal();
-        const today = now.slice(0, 10);
-        const nowAt = nowPosition(now);
-        let free = 0;
-        const cards = document.querySelectorAll<HTMLElement>("#board .card");
-        for (const card of cards) {
-          const roomId = Number(card.dataset.roomId);
-          const name = card.querySelector("h3")?.textContent ?? "";
-          const mine = all.filter((b) => b.roomId === roomId);
-          const status = roomStatus(mine, now);
-          if (status.state === "free") free++;
-          card.classList.toggle("free", status.state === "free");
-          card.classList.toggle("busy", status.state === "busy");
-          const text = card.querySelector(".status-text");
-          if (text) text.textContent = statusText(status, now);
-
-          const timeline = card.querySelector<HTMLElement>(".timeline");
-          if (timeline) {
-            const blocks = timelineBlocks(mine, today);
-            timeline.replaceChildren(
-              ...blocks.map((b) => {
-                const el = document.createElement("span");
-                el.className = "block";
-                el.style.left = `${b.left}%`;
-                el.style.width = `${b.width}%`;
-                el.title = b.label;
-                return el;
-              }),
-            );
-            if (nowAt !== undefined) {
-              const marker = document.createElement("span");
-              marker.className = "now";
-              marker.style.left = `${nowAt}%`;
-              timeline.append(marker);
-            }
-            timeline.setAttribute(
-              "aria-label",
-              `Today's bookings for ${name}: ${blocks.length ? blocks.map((b) => b.label).join(", ") : "none"}`,
-            );
-          }
-
-          const link = card.querySelector<HTMLAnchorElement>(".book-link");
-          if (link) {
-            const slot = suggestSlot(mine, now);
-            link.href = `/?${new URLSearchParams({ roomId: String(roomId), ...slot })}#book`;
-          }
-        }
-        const summary = document.querySelector("#free-summary");
-        if (summary) {
-          const strong = document.createElement("strong");
-          strong.textContent = `${free} of ${cards.length}`;
-          summary.replaceChildren(strong, ` rooms free at ${now.slice(11, 16)}`);
-        }
+      {
+        shown.length === 0 && (
+          <div class="empty">
+            <p class="empty-title">No room fits all of those filters.</p>
+            <div class="empty-actions">
+              <a class="btn btn-primary" href={`${searchHref(search, { people: undefined, building: undefined, facility: undefined })}#results`}>Clear filters</a>
+            </div>
+          </div>
+        )
       }
 
-      // The live half of the app: every other tab hears about a new booking
-      // over SSE — it lands in "Just booked" and re-lights the board.
-      const live = document.querySelector("#live");
-      const source = new EventSource("/api/events");
-      source.addEventListener("message", (event) => {
-        const booking = JSON.parse(event.data);
-        all.push(booking);
-        render();
-        const card = document.querySelector<HTMLElement>(`#board .card[data-room-id="${booking.roomId}"]`);
-        card?.classList.remove("flash");
-        void card?.offsetWidth;
-        card?.classList.add("flash");
-        const item = document.createElement("li");
-        item.textContent = `${booking.roomName}: ${booking.pod}, ${booking.startsAt.replace("T", " ")}–${booking.endsAt.replace("T", " ")}`;
-        live?.prepend(item);
-      });
+      <div class="space-list">
+        {
+          shown.map((result) => (
+            <RoomCard result={result} search={search} now={now} selected={result.room.id === selRoomId} />
+          ))
+        }
+      </div>
 
-      setInterval(render, 30_000);
-    </script>
-  </body>
-</html>
+      {
+        hiddenCount > 0 && shown.length > 0 && (
+          <p class="hidden-note">
+            {hiddenCount} {hiddenCount === 1 ? "room doesn't" : "rooms don't"} match your filters.{" "}
+            <a href={`${searchHref(search, { people: undefined, building: undefined, facility: undefined })}#results`}>Show all rooms</a>
+          </p>
+        )
+      }
+    </section>
+
+    <div class="side">
+      {
+        sheetOpen ? (
+          <BookingSheet
+            rooms={rooms}
+            roomId={selRoom?.id}
+            details={selRoom ? detailsFor(selRoom) : undefined}
+            values={values}
+            error={errorCode}
+            taken={taken}
+            alternatives={alternatives}
+            now={now}
+            closeHref={closeHref}
+          />
+        ) : (
+          <section class="side-card" aria-labelledby="side-heading">
+            {myNext.length > 0 ? (
+              <>
+                <p class="overline">From this browser</p>
+                <h2 id="side-heading">Your next bookings</h2>
+                <ul class="mini-list">
+                  {myNext.map((b) => (
+                    <li>
+                      <a href={`/booking/${b.id}/`}>
+                        <span class="mini-when">{fmtDay(b.startsAt, now)}, {fmtTime(b.startsAt)}</span>
+                        <span class="mini-where">{detailsFor({ id: b.roomId, name: b.roomName }).room} · {b.pod}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+                <a class="space-link" href="/mine/">All my bookings <Icon name="arrow" /></a>
+              </>
+            ) : (
+              <>
+                <p class="overline">How it works</p>
+                <h2 id="side-heading">Three steps, no accounts</h2>
+                <ol class="steps">
+                  <li><strong>Set a time.</strong> Date, start and how long — the rooms re-sort around it.</li>
+                  <li><strong>Pick a room.</strong> Hatched blocks are taken; the gold outline is your time.</li>
+                  <li><strong>Confirm.</strong> Add your pod's name. It's in the calendar for everyone, instantly.</li>
+                </ol>
+              </>
+            )}
+          </section>
+        )
+      }
+    </div>
+  </div>
+
+  <section class="wrap ledger" aria-labelledby="ledger-heading">
+    <h2 id="ledger-heading">Booking ledger</h2>
+    <p class="muted">Every booking across every room, oldest first.</p>
+    {
+      bookings.length === 0 ? (
+        <p class="empty-title">No bookings yet — the first one's yours.</p>
+      ) : (
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Scrollable table of all bookings">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Room</th>
+                <th scope="col">Pod</th>
+                <th scope="col">Tutor</th>
+                <th scope="col">Starts</th>
+                <th scope="col">Ends</th>
+                <th scope="col">Calendar</th>
+              </tr>
+            </thead>
+            <tbody id="schedule">
+              {/* "(past)" is the real signal; the dimming is a bonus (WCAG 1.4.1). */}
+              {bookings.map((booking) => {
+                const isPast = booking.endsAt < now;
+                return (
+                  <tr class={isPast ? "past" : undefined}>
+                    <td>{booking.roomName}</td>
+                    <td>{booking.pod}</td>
+                    <td>{booking.tutor ?? "—"}</td>
+                    <td>{booking.startsAt.replace("T", " ")}</td>
+                    <td>
+                      {booking.endsAt.replace("T", " ")}
+                      {isPast && " (past)"}
+                    </td>
+                    <td>
+                      <a href={`/api/calendar/${booking.id}`} download>
+                        .ics<span class="visually-hidden"> for {booking.pod} in {booking.roomName}</span>
+                      </a>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )
+    }
+  </section>
+
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+</Base>
+
+<script>
+  import "../scripts/live-page";
+</script>

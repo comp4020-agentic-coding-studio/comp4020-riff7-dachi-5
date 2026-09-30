@@ -1,18 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180">
-  <rect width="320" height="180" fill="#ece6ff"/>
-  <g fill="#c9bdf5">
-    <rect x="0" y="0" width="320" height="18"/>
-  </g>
-  <rect y="120" width="320" height="60" fill="#a99ad8"/>
-  <path d="M40 120 Q 160 60 280 120" fill="none" stroke="#5b47a8" stroke-width="5"/>
-  <g fill="#fff" stroke="#5b47a8" stroke-width="3">
-    <rect x="60" y="40" width="44" height="56" rx="3" transform="rotate(-6 82 68)"/>
-    <rect x="138" y="30" width="44" height="56" rx="3"/>
-    <rect x="216" y="40" width="44" height="56" rx="3" transform="rotate(6 238 68)"/>
-  </g>
-  <g fill="#ffd166"><rect x="70" y="52" width="24" height="8"/><rect x="148" y="42" width="24" height="8"/></g>
-  <g fill="#ef476f"><rect x="226" y="52" width="24" height="8"/></g>
-  <g fill="#3a2d6e">
-    <circle cx="70" cy="150" r="13"/><circle cx="125" cy="150" r="13"/><circle cx="195" cy="150" r="13"/><circle cx="250" cy="150" r="13"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+  <rect width="320" height="200" fill="#F5EDDE" stroke="none"/>
+  <path d="M60 24 H260 V128 H60 Z" fill="#FBF8F2"/>
+  <path d="M0 200 L60 128 H260 L320 200" fill="#EADFCB"/>
+  <path d="M0 0 L60 24 V128 L0 200 M320 0 L260 24 V128 L320 200"/>
+  <!-- whiteboards on three walls -->
+  <rect x="84" y="40" width="152" height="60" fill="#fff"/>
+  <path d="M98 58 C 120 48, 130 72, 150 60 S 190 50, 200 66" stroke="#BE830E" stroke-width="3"/>
+  <path d="M98 82 H160 M170 82 H218"/>
+  <path d="M14 60 L44 48 V110 L14 128 Z" fill="#fff"/>
+  <path d="M306 60 L276 48 V110 L306 128 Z" fill="#fff"/>
+  <!-- round table -->
+  <ellipse cx="160" cy="164" rx="70" ry="18" fill="#fff"/>
+  <g fill="#1a1a1a" stroke="none">
+    <circle cx="104" cy="144" r="5"/><circle cx="140" cy="140" r="5"/><circle cx="180" cy="140" r="5"/><circle cx="216" cy="144" r="5"/>
   </g>
 </svg>

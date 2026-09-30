@@ -1,0 +1,52 @@
+---
+import { type BoardBooking, DAY_END, DAY_START, timelineBlocks } from "../lib/board";
+import { fmtTime } from "../lib/format";
+
+type Props = {
+  bookings: BoardBooking[];
+  day: string;
+  now: string;
+  roomName: string;
+  window?: { start: string; end: string };
+};
+const { bookings, day, now, roomName, window } = Astro.props;
+
+const blocks = timelineBlocks(bookings, day);
+const span = DAY_END - DAY_START;
+const pos = (ts: string) => {
+  if (ts.slice(0, 10) < day) return 0;
+  if (ts.slice(0, 10) > day) return 100;
+  const m = Number(ts.slice(11, 13)) * 60 + Number(ts.slice(14, 16));
+  return Math.min(100, Math.max(0, ((m - DAY_START) / span) * 100));
+};
+const today = now.slice(0, 10);
+const pastTo = day < today ? 100 : day > today ? 0 : pos(now);
+const sel = window ? { left: pos(window.start), right: pos(window.end) } : undefined;
+const dayBookings = bookings
+  .filter((b) => b.startsAt.slice(0, 10) <= day && b.endsAt.slice(0, 10) >= day)
+  .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+const summary = dayBookings.length
+  ? `Booked ${dayBookings.map((b) => `${fmtTime(b.startsAt)} to ${fmtTime(b.endsAt)}`).join(", ")}; free otherwise`
+  : "No bookings, free all day";
+const ticks = [8, 10, 12, 14, 16, 18, 20];
+---
+
+<div class="tl">
+  <div class="tl-track" role="img" aria-label={`${roomName}, 8 am to 8 pm: ${summary}.`}>
+    {pastTo > 0 && <span class="tl-past" style={`width:${pastTo}%`} />}
+    {
+      blocks.map((b) => (
+        <span class="tl-block" style={`left:${b.left}%;width:${b.width}%`} title={b.label} />
+      ))
+    }
+    {
+      sel && sel.right > sel.left && (
+        <span class="tl-sel" style={`left:${sel.left}%;width:${sel.right - sel.left}%`} />
+      )
+    }
+    {pastTo > 0 && pastTo < 100 && <span class="tl-now" style={`left:${pastTo}%`} />}
+  </div>
+  <div class="tl-scale" aria-hidden="true">
+    {ticks.map((h) => <span>{h === 12 ? "12pm" : h < 12 ? `${h}am` : `${h - 12}`}</span>)}
+  </div>
+</div>

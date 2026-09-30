@@ -1,51 +1,43 @@
 ---
+import Icon from "../components/Icon.astro";
+import Base from "../layouts/Base.astro";
 import { roomStatus, statusText } from "../lib/board";
 import { listBookings, listRooms, nowLocal } from "../lib/db";
-import "../styles.css";
+import { fmtTime } from "../lib/format";
+import { detailsFor } from "../lib/spaces";
 
 // A door display: one room, full screen, readable from across a corridor.
+// Without ?room it's the index of every room's display.
 const rooms = listRooms();
-const roomId = Number(Astro.url.searchParams.get("room")) || rooms[0].id;
-const room = rooms.find((r) => r.id === roomId) ?? rooms[0];
+const roomParam = Number(Astro.url.searchParams.get("room"));
+const room = rooms.find((r) => r.id === roomParam);
 const now = nowLocal();
 const today = now.slice(0, 10);
-const roomBookings = listBookings()
-  .filter((b) => b.roomId === room.id)
-  .map(({ roomId, pod, startsAt, endsAt }) => ({ roomId, pod, startsAt, endsAt }));
+const all = listBookings().map(({ roomId, pod, startsAt, endsAt }) => ({ roomId, pod, startsAt, endsAt }));
+
+const roomBookings = room ? all.filter((b) => b.roomId === room.id) : [];
 const status = roomStatus(roomBookings, now);
 const upcoming = roomBookings.filter((b) => b.endsAt > now && b.startsAt.slice(0, 10) === today);
+const details = room ? detailsFor(room) : undefined;
 ---
 
-<!doctype html>
-<html lang="en-AU">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{room.name} · Door display</title>
-  </head>
-  <body class={`kiosk ${status.state}`}>
-    <nav aria-label="site">
-      <a href="/">Crit Rooms</a>
-      {
-        rooms.map((r) => (
-          <a href={`/kiosk/?room=${r.id}`} aria-current={r.id === room.id ? "page" : undefined}>
-            {r.name.split(" — ").pop()}
-          </a>
-        ))
-      }
-    </nav>
-    <main class="kiosk-main" data-room-id={room.id}>
-      <img src={`/rooms/${room.id}.svg`} alt="" width="320" height="180" class="kiosk-img" />
-      <div>
-        <h1>{room.name}</h1>
-        <p class="kiosk-state" aria-live="polite">
-          <span id="kiosk-word">{status.state === "free" ? "FREE" : "IN USE"}</span>
-          <span id="kiosk-detail" class="kiosk-detail">{statusText(status, now)}</span>
-        </p>
-        <h2>Still to come today</h2>
-        <ul id="kiosk-upcoming" class="kiosk-upcoming">
-          {
-            upcoming.length === 0 ? (
+{
+  room && details ? (
+    <Base title={`${details.room} · Door display`} active="displays" bodyClass={`kiosk ${status.state}`}>
+      <div class="kiosk-main" data-room-id={room.id}>
+        <div class="kiosk-where">
+          <p class="overline overline-gold">{details.building} · {details.level}</p>
+          <h1>{details.room}</h1>
+          <img src={`/rooms/${room.id}.svg`} alt="" width="320" height="200" class="kiosk-img" />
+        </div>
+        <div class="kiosk-now">
+          <p class="kiosk-state" aria-live="polite">
+            <span id="kiosk-word">{status.state === "free" ? "Free" : "In use"}</span>
+            <span id="kiosk-detail" class="kiosk-detail">{statusText(status, now)}</span>
+          </p>
+          <h2>Still to come today</h2>
+          <ul id="kiosk-upcoming" class="kiosk-upcoming">
+            {upcoming.length === 0 ? (
               <li>Nothing else booked today.</li>
             ) : (
               upcoming.map((b) => (
@@ -53,60 +45,104 @@ const upcoming = roomBookings.filter((b) => b.endsAt > now && b.startsAt.slice(0
                   {b.startsAt.slice(11, 16)}–{b.endsAt.slice(11, 16)} · {b.pod}
                 </li>
               ))
-            )
-          }
-        </ul>
-        <p class="kiosk-clock">Updated <span id="kiosk-time">{now.slice(11, 16)}</span></p>
+            )}
+          </ul>
+          <p class="kiosk-foot">
+            <span>Updated <span id="kiosk-time">{now.slice(11, 16)}</span></span>
+            <a href={`/?roomId=${room.id}#results`}>Book this room</a>
+          </p>
+        </div>
       </div>
-    </main>
-    <script
-      is:inline
-      type="application/json"
-      id="kiosk-data"
-      set:html={JSON.stringify(roomBookings).replace(/</g, "\\u003c")}
-    />
-    <script>
-      import { type BoardBooking, nowLocal, roomStatus, statusText } from "../lib/board";
+      <script
+        is:inline
+        type="application/json"
+        id="kiosk-data"
+        set:html={JSON.stringify(roomBookings).replace(/</g, "\\u003c")}
+      />
+    </Base>
+  ) : (
+    <Base title="Door displays · Crit Rooms" active="displays">
+      <div class="wrap">
+        <header class="page-head">
+          <p class="overline overline-gold">For the tablet by the door</p>
+          <h1>Door displays</h1>
+          <p class="muted">
+            Open one of these full screen on a device outside the room. It turns
+            green or red, and updates the moment anyone books or cancels.
+          </p>
+        </header>
+        <ul class="display-grid">
+          {rooms.map((r) => {
+            const d = detailsFor(r);
+            const s = roomStatus(all.filter((b) => b.roomId === r.id), now);
+            return (
+              <li>
+                <a class={`display-card ${s.state}`} href={`/kiosk/?room=${r.id}`}>
+                  <span class="display-state">
+                    <Icon name={s.state === "free" ? "check" : "cross"} /> {s.state === "free" ? "Free" : "In use"}
+                  </span>
+                  <span class="display-name">{d.room}</span>
+                  <span class="display-where">{d.building} · {d.level}</span>
+                  <span class="display-detail">
+                    {s.state === "busy" ? `Until ${fmtTime(s.current.endsAt)}` : s.next ? `Next ${fmtTime(s.next.startsAt)}` : "Nothing else booked"}
+                  </span>
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </Base>
+  )
+}
 
-      const main = document.querySelector<HTMLElement>(".kiosk-main");
-      const roomId = Number(main?.dataset.roomId);
-      const mine: BoardBooking[] = JSON.parse(
-        document.querySelector("#kiosk-data")?.textContent ?? "[]",
+<script>
+  import { type BoardBooking, nowLocal, roomStatus, statusText } from "../lib/board";
+
+  const main = document.querySelector<HTMLElement>(".kiosk-main");
+  if (main) {
+    const roomId = Number(main.dataset.roomId);
+    const mine: BoardBooking[] = JSON.parse(document.querySelector("#kiosk-data")?.textContent ?? "[]");
+
+    const render = () => {
+      const now = nowLocal();
+      const status = roomStatus(mine, now);
+      document.body.classList.toggle("free", status.state === "free");
+      document.body.classList.toggle("busy", status.state === "busy");
+      const word = document.querySelector("#kiosk-word");
+      if (word) word.textContent = status.state === "free" ? "Free" : "In use";
+      const detail = document.querySelector("#kiosk-detail");
+      if (detail) detail.textContent = statusText(status, now);
+      const time = document.querySelector("#kiosk-time");
+      if (time) time.textContent = now.slice(11, 16);
+      const upcoming = mine
+        .filter((b) => b.endsAt > now && b.startsAt.slice(0, 10) === now.slice(0, 10))
+        .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+      const items = upcoming.map((b) =>
+        Object.assign(document.createElement("li"), {
+          textContent: `${b.startsAt.slice(11, 16)}–${b.endsAt.slice(11, 16)} · ${b.pod}`,
+        }),
       );
-
-      function render() {
-        const now = nowLocal();
-        const status = roomStatus(mine, now);
-        document.body.classList.toggle("free", status.state === "free");
-        document.body.classList.toggle("busy", status.state === "busy");
-        const word = document.querySelector("#kiosk-word");
-        if (word) word.textContent = status.state === "free" ? "FREE" : "IN USE";
-        const detail = document.querySelector("#kiosk-detail");
-        if (detail) detail.textContent = statusText(status, now);
-        const time = document.querySelector("#kiosk-time");
-        if (time) time.textContent = now.slice(11, 16);
-        const list = document.querySelector("#kiosk-upcoming");
-        const upcoming = mine
-          .filter((b) => b.endsAt > now && b.startsAt.slice(0, 10) === now.slice(0, 10))
-          .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
-        list?.replaceChildren(
-          ...(upcoming.length
-            ? upcoming.map((b) => {
-                const li = document.createElement("li");
-                li.textContent = `${b.startsAt.slice(11, 16)}–${b.endsAt.slice(11, 16)} · ${b.pod}`;
-                return li;
-              })
-            : [Object.assign(document.createElement("li"), { textContent: "Nothing else booked today." })]),
+      document
+        .querySelector("#kiosk-upcoming")
+        ?.replaceChildren(
+          ...(items.length ? items : [Object.assign(document.createElement("li"), { textContent: "Nothing else booked today." })]),
         );
-      }
+    };
 
-      new EventSource("/api/events").addEventListener("message", (event) => {
-        const booking = JSON.parse(event.data);
-        if (booking.roomId !== roomId) return;
-        mine.push(booking);
-        render();
-      });
-      setInterval(render, 30_000);
-    </script>
-  </body>
-</html>
+    const source = new EventSource("/api/events");
+    source.addEventListener("message", (event) => {
+      const booking = JSON.parse(event.data);
+      if (booking.roomId !== roomId) return;
+      mine.push(booking);
+      render();
+    });
+    source.addEventListener("cancel", (event) => {
+      const gone = JSON.parse((event as MessageEvent).data);
+      const i = mine.findIndex((b) => b.roomId === gone.roomId && b.startsAt === gone.startsAt && b.endsAt === gone.endsAt);
+      if (i >= 0) mine.splice(i, 1);
+      render();
+    });
+    setInterval(render, 30_000);
+  }
+</script>

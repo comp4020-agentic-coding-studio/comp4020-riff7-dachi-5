@@ -1,0 +1,101 @@
+---
+import { addMinutes } from "../lib/board";
+import { fmtDuration } from "../lib/format";
+import { DURATIONS, type Search } from "../lib/search";
+import { BUILDINGS, FACILITY_LABEL, type Facility } from "../lib/spaces";
+
+type Props = { search: Search; now: string };
+const { search, now } = Astro.props;
+const today = now.slice(0, 10);
+const tomorrow = addMinutes(`${today}T00:00`, 24 * 60).slice(0, 10);
+
+const times: string[] = [];
+for (let m = 7 * 60; m <= 21 * 60; m += 15) {
+  times.push(`${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`);
+}
+if (!times.includes(search.time)) times.push(search.time), times.sort();
+const label = (t: string) => {
+  const h = Number(t.slice(0, 2));
+  return `${h % 12 === 0 ? 12 : h % 12}:${t.slice(3)} ${h < 12 ? "am" : "pm"}`;
+};
+const durations = DURATIONS.includes(search.duration)
+  ? DURATIONS
+  : [...DURATIONS, search.duration].sort((a, b) => a - b);
+const PEOPLE = [0, 2, 4, 6, 8, 12, 16, 24, 40];
+const filtersActive = Boolean(search.building || search.facilities.length);
+---
+
+<form class="finder" method="get" action="/#results" aria-labelledby="finder-heading" data-autosubmit>
+  <h2 id="finder-heading" class="finder-title">Find a space</h2>
+
+  <div class="quick" role="group" aria-label="Shortcuts">
+    <a class="quick-link" href="/#results">Available now</a>
+    <a class="quick-link" href={`/?date=${today}&time=14:00&duration=60#results`}>This afternoon</a>
+    <a class="quick-link" href={`/?date=${tomorrow}&time=09:00&duration=120#results`}>Tomorrow morning</a>
+  </div>
+
+  <div class="finder-grid">
+    <div class="ctl">
+      <label for="f-date">Date</label>
+      <input id="f-date" name="date" type="date" min={today} value={search.date} required />
+    </div>
+    <div class="ctl">
+      <label for="f-time">From</label>
+      <select id="f-time" name="time">
+        {times.map((t) => <option value={t} selected={t === search.time}>{label(t)}</option>)}
+      </select>
+    </div>
+    <div class="ctl">
+      <label for="f-people">People</label>
+      <select id="f-people" name="people">
+        {
+          PEOPLE.map((p) => (
+            <option value={p || ""} selected={p === search.people}>
+              {p === 0 ? "Any size" : `${p}+ people`}
+            </option>
+          ))
+        }
+      </select>
+    </div>
+  </div>
+
+  <fieldset class="durations">
+    <legend>For how long</legend>
+    <div class="chips">
+      {
+        durations.map((d) => (
+          <label class="chip">
+            <input type="radio" name="duration" value={d} checked={d === search.duration} />
+            <span>{fmtDuration(d)}</span>
+          </label>
+        ))
+      }
+    </div>
+  </fieldset>
+
+  <details class="more" open={filtersActive}>
+    <summary>More filters{filtersActive && <span class="more-on"> · on</span>}</summary>
+    <div class="more-body">
+      <div class="ctl">
+        <label for="f-building">Building</label>
+        <select id="f-building" name="building">
+          <option value="">Any building</option>
+          {BUILDINGS.map((b) => <option value={b} selected={b === search.building}>{b}</option>)}
+        </select>
+      </div>
+      <fieldset class="facilities">
+        <legend>Must have</legend>
+        {
+          (Object.keys(FACILITY_LABEL) as Facility[]).map((f) => (
+            <label class="check">
+              <input type="checkbox" name="facility" value={f} checked={search.facilities.includes(f)} />
+              {FACILITY_LABEL[f]}
+            </label>
+          ))
+        }
+      </fieldset>
+    </div>
+  </details>
+
+  <button class="btn btn-primary btn-block">Show spaces</button>
+</form>

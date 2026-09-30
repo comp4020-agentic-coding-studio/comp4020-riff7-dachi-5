@@ -48,7 +48,7 @@ describe("bookings", () => {
       }),
     );
     expect(res.status).toBe(303);
-    expect(res.headers.get("location")).toBe("/");
+    expect(res.headers.get("location")).toMatch(/^\/booking\/\d+\/\?new=1$/);
   });
 
   it("persists the booking: a fresh page load includes it", async () => {
@@ -126,14 +126,14 @@ describe("bookings", () => {
       booking({ pod: first, roomId: "4", startsAt: "2031-05-01T09:00", endsAt: "2031-05-01T10:00" }),
     );
     expect(firstRes.status).toBe(303);
-    expect(firstRes.headers.get("location")).toBe("/");
+    expect(firstRes.headers.get("location")).toMatch(/^\/booking\//);
 
     const secondRes = await post(
       "/api/bookings",
       booking({ pod: second, roomId: "4", startsAt: "2031-05-01T10:00", endsAt: "2031-05-01T11:00" }),
     );
     expect(secondRes.status).toBe(303);
-    expect(secondRes.headers.get("location")).toBe("/");
+    expect(secondRes.headers.get("location")).toMatch(/^\/booking\//);
 
     const body = await (await fetch(baseUrl)).text();
     expect(body).toContain(first);

@@ -1,0 +1,148 @@
+---
+import type { BoardBooking } from "../lib/board";
+import { fmtDuration, fmtRange, fmtTime, minutesBetween } from "../lib/format";
+import type { SpaceDetails } from "../lib/spaces";
+import Icon from "./Icon.astro";
+
+type Alt = { label: string; href: string };
+type Props = {
+  rooms: { id: number; name: string }[];
+  roomId?: number;
+  details?: SpaceDetails;
+  values: { pod: string; tutor: string; startsAt: string; endsAt: string };
+  error?: string;
+  /** Who holds the slot, when the chosen time is already taken. */
+  taken?: BoardBooking;
+  alternatives: Alt[];
+  now: string;
+  closeHref: string;
+};
+const { rooms, roomId, details, values, error, taken, alternatives, now, closeHref } = Astro.props;
+
+const ERROR_TEXT: Record<string, string> = {
+  missing: "Add a pod name — every booking needs one.",
+  "unknown-room": "That room doesn't exist. Pick one of the spaces below.",
+  "bad-format": "That doesn't look like a real date and time. Check both times.",
+  "too-long": "Pod and tutor names can be at most 80 characters.",
+  "bad-range": "The booking has to end after it starts.",
+  conflict: "Someone booked this room for part of that time.",
+};
+const hasTimes = /T\d\d:\d\d$/.test(values.startsAt) && /T\d\d:\d\d$/.test(values.endsAt);
+const validRange = hasTimes && values.startsAt < values.endsAt;
+const timeError = error === "bad-range" || error === "bad-format";
+---
+
+<section id="book" class="sheet" aria-labelledby="book-heading">
+  <div class="sheet-head">
+    <p class="overline">Your booking</p>
+    <h2 id="book-heading">Review and book</h2>
+    <a class="sheet-close" href={closeHref}>
+      <Icon name="close" /><span class="visually-hidden">Close and keep browsing</span>
+    </a>
+  </div>
+
+  {
+    error && (
+      <div role="alert" class="notice notice-error">
+        <p class="notice-title">
+          <Icon name="cross" /> {ERROR_TEXT[error] ?? "That booking couldn't be made."}
+        </p>
+        {error === "conflict" && taken && (
+          <p>
+            {taken.pod} has it {fmtTime(taken.startsAt)} – {fmtTime(taken.endsAt)}. Nothing was booked.
+          </p>
+        )}
+        {alternatives.length > 0 && (
+          <ul class="alts">
+            {alternatives.map((a) => (
+              <li>
+                <a href={a.href}>
+                  {a.label} <Icon name="arrow" />
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    )
+  }
+
+  {
+    details && (
+      <div class="summary">
+        <img src={`/rooms/${roomId}.svg`} alt="" width="120" height="75" />
+        <div>
+          <p class="summary-room">{details.room}</p>
+          <p class="summary-where">
+            <Icon name="pin" /> {details.building} · {details.level}
+          </p>
+          {validRange && (
+            <p class="summary-when">
+              <Icon name="clock" /> {fmtRange(values.startsAt, values.endsAt, now)}
+              <span class="summary-dur"> · {fmtDuration(minutesBetween(values.startsAt, values.endsAt))}</span>
+            </p>
+          )}
+          <p class="summary-where">
+            <Icon name="people" /> Seats {details.capacity}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  {
+    !error && validRange && (
+      <p id="sheet-status" class={`slot-status ${taken ? "taken" : "free"}`} aria-live="polite">
+        {taken ? (
+          <>
+            <Icon name="cross" /> Just taken by {taken.pod} — pick another time below.
+          </>
+        ) : (
+          <>
+            <Icon name="check" /> This time is free
+          </>
+        )}
+      </p>
+    )
+  }
+
+  <form method="post" action="/api/bookings" class="book-form" aria-labelledby="book-heading">
+    <div class="field">
+      <label for="pod">Pod or group name</label>
+      <input id="pod" name="pod" required maxlength="80" placeholder="e.g. Dachi" value={values.pod} autocomplete="organization" />
+    </div>
+    <div class="field">
+      <label for="tutor">Tutor <span class="optional">optional</span></label>
+      <input id="tutor" name="tutor" maxlength="80" placeholder="Who's running the crit" value={values.tutor} />
+    </div>
+
+    <details class="change" open={timeError || !details || !validRange}>
+      <summary>Change room or time</summary>
+      <div class="change-body">
+        <div class="field">
+          <label for="roomId">Room</label>
+          <select id="roomId" name="roomId" required>
+            {
+              rooms.map((room) => (
+                <option value={room.id} selected={roomId === room.id}>
+                  {room.name}
+                </option>
+              ))
+            }
+          </select>
+        </div>
+        <div class="field">
+          <label for="startsAt">Starts</label>
+          <input id="startsAt" name="startsAt" type="datetime-local" step="900" required value={values.startsAt} aria-invalid={timeError ? "true" : undefined} />
+        </div>
+        <div class="field">
+          <label for="endsAt">Ends</label>
+          <input id="endsAt" name="endsAt" type="datetime-local" step="900" required value={values.endsAt} aria-invalid={timeError ? "true" : undefined} />
+        </div>
+      </div>
+    </details>
+
+    <button class="btn btn-primary btn-block btn-lg">Confirm booking</button>
+    <p class="fine">Bookings made here can be cancelled from this browser under My bookings.</p>
+  </form>
+</section>

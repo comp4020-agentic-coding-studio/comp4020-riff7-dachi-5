@@ -9,6 +9,7 @@ import { bus } from "../../lib/events";
 // only when the client needs to push over the same connection.
 export const GET: APIRoute = () => {
   let onBooking: (booking: BookingWithRoom) => void;
+  let onCancel: (booking: BookingWithRoom) => void;
   let heartbeat: ReturnType<typeof setInterval>;
 
   const stream = new ReadableStream<string>({
@@ -21,11 +22,17 @@ export const GET: APIRoute = () => {
       onBooking = (booking) => {
         controller.enqueue(`data: ${JSON.stringify(booking)}\n\n`);
       };
+      // a named event, so older pages' plain `message` listeners ignore it
+      onCancel = (booking) => {
+        controller.enqueue(`event: cancel\ndata: ${JSON.stringify(booking)}\n\n`);
+      };
       bus.on("booking", onBooking);
+      bus.on("cancel", onCancel);
     },
     cancel() {
       clearInterval(heartbeat);
       bus.off("booking", onBooking);
+      bus.off("cancel", onCancel);
     },
   });
 

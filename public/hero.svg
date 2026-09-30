@@ -1,28 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 160">
-  <defs>
-    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0b3d91"/><stop offset="1" stop-color="#0b5fff"/>
-    </linearGradient>
-  </defs>
-  <rect width="800" height="160" fill="url(#sky)"/>
-  <circle cx="700" cy="40" r="22" fill="#ffd166"/>
-  <g fill="#ffffff" opacity="0.14"><circle cx="120" cy="30" r="40"/><circle cx="170" cy="40" r="30"/></g>
-  <g fill="#e8eefc">
-    <rect x="40" y="70" width="120" height="90"/>
-    <rect x="190" y="50" width="90" height="110"/>
-    <rect x="310" y="85" width="160" height="75"/>
-    <rect x="500" y="60" width="110" height="100"/>
-    <rect x="640" y="90" width="120" height="70"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" fill="none">
+  <!-- An abstract campus plan: building footprints, paths, and four marked rooms. -->
+  <g stroke="#ffffff" stroke-opacity="0.08">
+    <path d="M0 40 H600 M0 80 H600 M0 120 H600 M0 160 H600 M0 200 H600 M0 240 H600 M0 280 H600 M0 320 H600 M0 360 H600"/>
+    <path d="M40 0 V400 M80 0 V400 M120 0 V400 M160 0 V400 M200 0 V400 M240 0 V400 M280 0 V400 M320 0 V400 M360 0 V400 M400 0 V400 M440 0 V400 M480 0 V400 M520 0 V400 M560 0 V400"/>
   </g>
-  <g fill="#6ef0a4">
-    <rect x="60" y="90" width="20" height="16"/><rect x="100" y="90" width="20" height="16"/>
-    <rect x="205" y="70" width="20" height="16"/><rect x="330" y="105" width="20" height="16"/>
-    <rect x="520" y="80" width="20" height="16"/><rect x="660" y="110" width="20" height="16"/>
+  <g stroke="#ffffff" stroke-opacity="0.35" stroke-width="1.5" fill="#ffffff" fill-opacity="0.04">
+    <path d="M60 60 H190 V130 H130 V170 H60 Z"/>
+    <path d="M250 50 H360 V150 H250 Z"/>
+    <path d="M420 70 H540 V120 H480 V190 H420 Z"/>
+    <path d="M80 230 H200 V330 H80 Z"/>
+    <path d="M260 220 H330 V260 H390 V340 H260 Z"/>
+    <path d="M440 250 H550 V350 H440 Z"/>
   </g>
-  <g fill="#ef476f">
-    <rect x="245" y="70" width="20" height="16"/><rect x="370" y="105" width="20" height="16"/>
-    <rect x="560" y="80" width="20" height="16"/><rect x="700" y="110" width="20" height="16"/>
-    <rect x="60" y="120" width="20" height="16"/>
+  <path d="M0 200 C 120 190, 200 210, 300 200 S 480 180, 600 205" stroke="#ffffff" stroke-opacity="0.25" stroke-width="10"/>
+  <path d="M225 0 C 230 120, 215 260, 230 400" stroke="#ffffff" stroke-opacity="0.2" stroke-width="6"/>
+  <path d="M125 150 C 180 200, 250 170, 300 100 S 440 150, 480 160" stroke="#BE830E" stroke-width="2.5" stroke-dasharray="6 6"/>
+  <g fill="#BE830E">
+    <circle cx="125" cy="150" r="7"/>
+    <circle cx="300" cy="100" r="7"/>
+    <circle cx="480" cy="160" r="7"/>
   </g>
-  <rect y="156" width="800" height="4" fill="#ffd166"/>
+  <circle cx="330" cy="300" r="7" fill="none" stroke="#BE830E" stroke-width="2.5"/>
+  <circle cx="125" cy="150" r="16" stroke="#BE830E" stroke-opacity="0.5"/>
 </svg>

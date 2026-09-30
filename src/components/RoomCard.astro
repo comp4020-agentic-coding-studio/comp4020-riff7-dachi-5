@@ -1,0 +1,105 @@
+---
+import { fmtTime } from "../lib/format";
+import { bookHref, type RoomResult, type Search } from "../lib/search";
+import { FACILITY_LABEL } from "../lib/spaces";
+import Icon from "./Icon.astro";
+import Timeline from "./Timeline.astro";
+
+type Props = {
+  result: RoomResult<{ id: number; name: string }>;
+  search: Search;
+  now: string;
+  selected: boolean;
+};
+const { result, search, now, selected } = Astro.props;
+const { room, details, available, conflict, next, fits, missing } = result;
+const headingId = `space-${room.id}`;
+const nextIsToday = next.startsAt.slice(0, 10) === search.date;
+const nextLabel = `${nextIsToday ? "" : `${next.startsAt.slice(5, 10).split("-").reverse().join("/")} `}${fmtTime(next.startsAt)}`;
+---
+
+<article
+  class:list={["space", available ? "is-free" : "is-booked", { "is-selected": selected, "is-unfit": !fits }]}
+  aria-labelledby={headingId}
+  data-room-id={room.id}
+>
+  <img class="space-img" src={`/rooms/${room.id}.svg`} alt="" width="320" height="200" loading="lazy" />
+
+  <div class="space-body">
+    <p class="space-meta">
+      <span class="space-code">{details.code}</span>
+      {details.building} · {details.level} · {details.kind}
+    </p>
+    <h3 id={headingId} class="space-name">{details.room}</h3>
+    <ul class="space-facts" aria-label="Capacity and facilities">
+      <li><Icon name="people" /> {details.capacity} seats</li>
+      {
+        details.facilities.map((f) => (
+          <li>
+            <Icon name={f} /> {FACILITY_LABEL[f]}
+          </li>
+        ))
+      }
+    </ul>
+
+    <p class="space-status">
+      {
+        available ? (
+          <>
+            <span class="status-pill free"><Icon name="check" /> Available</span>
+            <span>
+              {fmtTime(search.start)} – {fmtTime(search.end)}
+              {result.freeUntil && result.freeUntil.slice(0, 10) === search.date
+                ? ` · free until ${fmtTime(result.freeUntil)}`
+                : " · free for the rest of the day"}
+            </span>
+          </>
+        ) : (
+          <>
+            <span class="status-pill booked"><Icon name="cross" /> Booked</span>
+            <span>
+              {conflict && `${conflict.pod}, ${fmtTime(conflict.startsAt)} – ${fmtTime(conflict.endsAt)}`}
+            </span>
+          </>
+        )
+      }
+    </p>
+
+    <Timeline
+      bookings={result.bookings}
+      day={search.date}
+      now={now}
+      roomName={`${details.room}, ${details.building}`}
+      window={{ start: search.start, end: search.end }}
+    />
+  </div>
+
+  <div class="space-action">
+    {
+      selected ? (
+        <p class="selected-badge">
+          <Icon name="check" /> Selected
+        </p>
+      ) : available ? (
+        <a class="btn btn-primary" href={bookHref(search, room.id, { startsAt: search.start, endsAt: search.end })}>
+          Book {fmtTime(search.start)}
+          <span class="visually-hidden">
+            {" "}to {fmtTime(search.end)} in {details.room}, {details.building}
+          </span>
+        </a>
+      ) : (
+        <>
+          <a class="btn btn-secondary" href={bookHref(search, room.id, next)}>
+            Book {nextLabel} instead
+            <span class="visually-hidden"> in {details.room}, {details.building}</span>
+          </a>
+          <p class="space-hint">Next free {search.duration}-minute slot</p>
+        </>
+      )
+    }
+    {!fits && <p class="space-unfit">Doesn't match: {missing.join(", ")}</p>}
+    <a class="space-link" href={`/kiosk/?room=${room.id}`}>
+      <Icon name="screen" /> Door display<span class="visually-hidden"> for {details.room}</span>
+    </a>
+  </div>
+</article>

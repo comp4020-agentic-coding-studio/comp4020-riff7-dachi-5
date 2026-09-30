@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
@@ -52,7 +53,8 @@ export function listRooms(): Room[] {
   return db.select().from(rooms).all();
 }
 
-export type BookingWithRoom = Booking & { roomName: string };
+// The cancel token never leaves the server except in the creator's cookie.
+export type BookingWithRoom = Omit<Booking, "cancelToken"> & { roomName: string };
 
 export function listBookings(): BookingWithRoom[] {
   return db
@@ -85,6 +87,18 @@ export function getBooking(id: number): BookingWithRoom | undefined {
   return listBookings().find((b) => b.id === id);
 }
 
+/** Deletes a booking only when the caller holds its cancel token. */
+export function cancelBooking(id: number, token: string): BookingWithRoom | undefined {
+  const booking = getBooking(id);
+  if (!booking || !token) return undefined;
+  const deleted = db
+    .delete(bookings)
+    .where(and(eq(bookings.id, id), eq(bookings.cancelToken, token)))
+    .returning({ id: bookings.id })
+    .all();
+  return deleted.length ? booking : undefined;
+}
+
 /** The existing booking a new one for the same room would collide with, if
  *  any — two half-open windows [startsAt, endsAt) overlap exactly when each
  *  starts before the other ends. */
@@ -115,7 +129,7 @@ export type NewBooking = {
 };
 
 export type CreateBookingResult =
-  | { ok: true; booking: BookingWithRoom }
+  | { ok: true; booking: BookingWithRoom; cancelToken: string }
   | {
       ok: false;
       reason: "unknown-room" | "bad-format" | "too-long" | "bad-range" | "conflict";
@@ -167,7 +181,8 @@ export function createBooking(input: NewBooking): CreateBookingResult {
     return { ok: false, reason: "conflict" };
   }
 
-  const booking = db
+  const cancelToken = randomBytes(16).toString("hex");
+  const { cancelToken: _secret, ...booking } = db
     .insert(bookings)
     .values({
       roomId: input.roomId,
@@ -175,9 +190,10 @@ export function createBooking(input: NewBooking): CreateBookingResult {
       tutor: input.tutor || null,
       startsAt: input.startsAt,
       endsAt: input.endsAt,
+      cancelToken,
     })
     .returning()
     .get();
 
-  return { ok: true, booking: { ...booking, roomName: room.name } };
+  return { ok: true, booking: { ...booking, roomName: room.name }, cancelToken };
 }

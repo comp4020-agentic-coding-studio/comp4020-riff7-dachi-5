@@ -1,0 +1,80 @@
+---
+import { readMine } from "../lib/mine";
+import "../styles.css";
+
+type Props = {
+  title: string;
+  active?: "find" | "mine" | "displays" | "about";
+  bodyClass?: string;
+};
+const { title, active, bodyClass } = Astro.props;
+const mineCount = readMine(Astro.cookies).length;
+const links = [
+  { key: "find", href: "/", label: "Find a space" },
+  { key: "mine", href: "/mine/", label: "My bookings" },
+  { key: "displays", href: "/kiosk/", label: "Door displays" },
+  { key: "about", href: "/readme/", label: "About" },
+] as const;
+---
+
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <title>{title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap"
+    />
+  </head>
+  <body class={bodyClass}>
+    <a class="skip" href="#content">Skip to content</a>
+    <header class="site-header">
+      <div class="wrap header-inner">
+        <a class="brand" href="/">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="brand-text">
+            <span class="brand-name">Crit Rooms</span>
+            <span class="brand-sub">Campus spaces for COMP4020 crits</span>
+          </span>
+        </a>
+        <nav aria-label="Main">
+          <ul>
+            {
+              links.map((l) => (
+                <li>
+                  <a href={l.href} aria-current={active === l.key ? "page" : undefined}>
+                    {l.label}
+                    {l.key === "mine" && mineCount > 0 && (
+                      <span class="count">
+                        {mineCount}
+                        <span class="visually-hidden"> bookings</span>
+                      </span>
+                    )}
+                  </a>
+                </li>
+              ))
+            }
+          </ul>
+        </nav>
+      </div>
+    </header>
+    <slot name="hero" />
+    <main id="content" tabindex="-1">
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <div class="wrap">
+        <p>
+          <strong>Crit Rooms</strong> is a COMP4020 student prototype, styled after
+          ANU's public colour palette. It is not an official ANU service; room
+          capacities and facilities are sample data.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

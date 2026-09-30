@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { createBooking } from "../../lib/db";
 import { bus } from "../../lib/events";
+import { addMine } from "../../lib/mine";
 
 // The write half of the app: a plain HTML form POSTs here, the booking is
 // validated (room exists, times make sense, no clash with an existing
@@ -19,7 +20,7 @@ function withInput(error: string, fields: Record<string, string | number>): stri
   return `/?${params}`;
 }
 
-export const POST: APIRoute = async ({ request, redirect }) => {
+export const POST: APIRoute = async ({ request, redirect, cookies, url }) => {
   const form = await request.formData();
   const roomId = Number(form.get("roomId"));
   const pod = String(form.get("pod") ?? "").trim();
@@ -38,5 +39,10 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   }
 
   bus.emit("booking", result.booking);
-  return redirect("/", 303);
+  addMine(
+    cookies,
+    { id: result.booking.id, token: result.cancelToken },
+    url.protocol === "https:",
+  );
+  return redirect(`/booking/${result.booking.id}/?new=1`, 303);
 };

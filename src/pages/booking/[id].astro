@@ -1,0 +1,114 @@
+---
+import Icon from "../../components/Icon.astro";
+import Base from "../../layouts/Base.astro";
+import { getBooking, nowLocal } from "../../lib/db";
+import { fmtDay, fmtDuration, fmtTime, minutesBetween } from "../../lib/format";
+import { tokenFor } from "../../lib/mine";
+import { detailsFor, FACILITY_LABEL } from "../../lib/spaces";
+
+const booking = getBooking(Number(Astro.params.id));
+if (!booking) {
+  Astro.response.status = 404;
+}
+const now = nowLocal();
+const isNew = Astro.url.searchParams.has("new");
+const mine = booking ? Boolean(tokenFor(Astro.cookies, booking.id)) : false;
+const details = booking ? detailsFor({ id: booking.roomId, name: booking.roomName }) : undefined;
+const past = booking ? booking.endsAt < now : false;
+const heading = !booking ? "Booking not found" : isNew ? "Booking confirmed" : past ? "Past booking" : "Your booking";
+---
+
+<Base title={`${heading} · Crit Rooms`} active={mine ? "mine" : undefined}>
+  <div class="wrap narrow">
+    {
+      !booking || !details ? (
+        <section class="confirm" aria-labelledby="confirm-heading">
+          <h1 id="confirm-heading">Booking not found</h1>
+          <p>It may have been cancelled. Nothing is held in its place.</p>
+          <p class="confirm-actions">
+            <a class="btn btn-primary" href="/">Find a space</a>
+            <a class="btn btn-secondary" href="/mine/">My bookings</a>
+          </p>
+        </section>
+      ) : (
+        <section class={`confirm ${isNew ? "is-new" : ""}`} aria-labelledby="confirm-heading">
+          {isNew && (
+            <svg class="tick" viewBox="0 0 52 52" width="64" height="64" aria-hidden="true">
+              <circle class="tick-ring" cx="26" cy="26" r="24" fill="none" />
+              <path class="tick-mark" fill="none" d="M15 27l7 7 15-16" />
+            </svg>
+          )}
+          <p class="overline overline-gold">{isNew ? "All set" : `Booking #${booking.id}`}</p>
+          <h1 id="confirm-heading" tabindex="-1">{heading}</h1>
+          {isNew && (
+            <p class="lede" role="status">
+              {details.room} is held for {booking.pod}. Everyone looking at the board can already see it.
+            </p>
+          )}
+
+          <div class="ticket">
+            <img src={`/rooms/${booking.roomId}.svg`} alt="" width="320" height="200" />
+            <dl class="ticket-body">
+              <div class="ticket-room">
+                <dt class="visually-hidden">Room</dt>
+                <dd>
+                  <span class="ticket-name">{details.room}</span>
+                  <span class="ticket-where">{details.building} · {details.level}</span>
+                </dd>
+              </div>
+              <div>
+                <dt>When</dt>
+                <dd>
+                  {fmtDay(booking.startsAt, now)}
+                  <br />
+                  <strong>
+                    {fmtTime(booking.startsAt)} – {fmtTime(booking.endsAt)}
+                  </strong>
+                  <span class="muted"> · {fmtDuration(minutesBetween(booking.startsAt, booking.endsAt))}</span>
+                </dd>
+              </div>
+              <div>
+                <dt>Pod</dt>
+                <dd>{booking.pod}</dd>
+              </div>
+              {booking.tutor && (
+                <div>
+                  <dt>Tutor</dt>
+                  <dd>{booking.tutor}</dd>
+                </div>
+              )}
+              <div>
+                <dt>Room</dt>
+                <dd>
+                  Seats {details.capacity} · {details.facilities.map((f) => FACILITY_LABEL[f]).join(", ")}
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="confirm-actions">
+            <a class="btn btn-primary" href={`/api/calendar/${booking.id}`} download>
+              <Icon name="calendar" /> Add to calendar
+            </a>
+            <a class="btn btn-secondary" href="/mine/">My bookings</a>
+            <a class="btn btn-ghost" href={`/kiosk/?room=${booking.roomId}`}>
+              <Icon name="screen" /> Door display
+            </a>
+          </div>
+
+          {mine && !past && (
+            <form method="post" action={`/api/bookings/${booking.id}/cancel`} class="cancel-form" data-confirm="Cancel this booking? The room will be released for everyone.">
+              <button class="btn btn-danger-link">Cancel this booking</button>
+            </form>
+          )}
+          <p class="back"><a href="/">← Back to all spaces</a></p>
+        </section>
+      )
+    }
+  </div>
+</Base>
+
+<script>
+  import "../../scripts/confirm-cancel";
+  document.querySelector<HTMLElement>(".is-new #confirm-heading")?.focus();
+</script>

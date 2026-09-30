@@ -80,7 +80,7 @@ describe("room board, rendered", () => {
 
   it("shows a card with an image for every room", async () => {
     const html = await (await fetch(new URL("/", baseUrl))).text();
-    expect(html.match(/class="card (free|busy)"/g)?.length).toBe(4);
+    expect(html.match(/class="space is-(free|booked)/g)?.length).toBe(4);
     expect(html).toContain('src="/rooms/1.svg"');
   });
 
@@ -109,8 +109,8 @@ describe("room board, rendered", () => {
   });
 
   it("answers 'find me a room' with a bookable slot", async () => {
-    const html = await (await fetch(new URL("/?need=90", baseUrl))).text();
-    expect(html).toMatch(/Soonest 90-minute slot/);
-    expect(html).toMatch(/href="\/\?roomId=\d&amp;startsAt=/);
+    const html = await (await fetch(new URL("/?duration=90", baseUrl))).text();
+    expect(html).toMatch(/1 h 30 min/);
+    expect(html).toMatch(/roomId=\d&amp;startsAt=/);
   });
 });

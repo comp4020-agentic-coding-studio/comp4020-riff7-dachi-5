@@ -1,13 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180">
-  <rect width="320" height="180" fill="#ffe3e3"/>
-  <rect y="128" width="320" height="52" fill="#b5838d"/>
-  <g stroke="#6d3b47" stroke-width="4" fill="none">
-    <line x1="60" y1="128" x2="90" y2="40"/><line x1="120" y1="128" x2="90" y2="40"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+  <rect width="320" height="200" fill="#F5EDDE" stroke="none"/>
+  <path d="M24 16 H296 V132 H24 Z" fill="#FBF8F2"/>
+  <path d="M0 200 L24 132 H296 L320 200" fill="#EADFCB"/>
+  <!-- pin-up wall grid of prints -->
+  <g fill="#fff">
+    <rect x="44" y="32" width="44" height="34"/><rect x="98" y="32" width="44" height="34"/>
+    <rect x="152" y="32" width="44" height="34"/><rect x="206" y="32" width="44" height="34"/>
+    <rect x="44" y="76" width="44" height="34"/><rect x="98" y="76" width="44" height="34"/>
+    <rect x="206" y="76" width="44" height="34"/>
   </g>
-  <rect x="62" y="48" width="56" height="44" fill="#fff" stroke="#6d3b47" stroke-width="3"/>
-  <circle cx="90" cy="70" r="12" fill="#ffb4a2"/>
-  <rect x="150" y="30" width="130" height="80" rx="4" fill="#fff" stroke="#6d3b47" stroke-width="3"/>
-  <g fill="#e5989b"><rect x="162" y="42" width="30" height="24"/><rect x="200" y="42" width="30" height="24"/><rect x="238" y="42" width="30" height="24"/></g>
-  <g fill="#6d6875"><rect x="162" y="74" width="30" height="24"/><rect x="200" y="74" width="30" height="24"/><rect x="238" y="74" width="30" height="24"/></g>
-  <rect x="140" y="140" width="150" height="12" rx="3" fill="#6d3b47"/>
+  <rect x="152" y="76" width="44" height="34" fill="#fff" stroke="#BE830E" stroke-width="3"/>
+  <path d="M52 56 L64 44 L80 58 M106 58 H134 M160 44 H188 M160 52 H180 M214 58 L226 42 L242 58 M52 100 H80 M106 84 V102 H134 M214 92 H242"/>
+  <!-- easel and stools -->
+  <path d="M258 196 L274 140 L290 196 M274 140 V132"/>
+  <rect x="256" y="112" width="36" height="28" fill="#fff"/>
+  <g fill="#1a1a1a" stroke="none">
+    <circle cx="90" cy="168" r="7"/><circle cx="140" cy="176" r="7"/><circle cx="190" cy="168" r="7"/>
+  </g>
 </svg>
